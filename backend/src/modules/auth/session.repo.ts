@@ -68,6 +68,12 @@ export function deleteSession(sessionId: string): void {
   getDb().prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
 }
 
+/**
+ * Delete a session only if it belongs to the specified user.
+ * Used by DELETE /api/me/sessions/:id to prevent cross-user session
+ * deletion (IDOR). Returns true if a row was deleted, false if the
+ * session doesn't exist or belongs to another user.
+ */
 export function deleteSessionScopedToUser(sessionId: string, userId: string): boolean {
   const result = getDb()
     .prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?')

@@ -17,7 +17,7 @@ import {
   listSessionsForUser,
 } from './session.repo.ts'
 import { buildSessionCookie } from './session.ts'
-import { getPasswordHash, updatePasswordHash } from './user.repo.ts'
+import { getPasswordHash, updatePasswordHash, touchLastLogin } from './user.repo.ts'
 
 const passwordBody = z.object({
   currentPassword: z.string().min(1).max(255),
@@ -56,12 +56,15 @@ export const meRoute = new Hono<AppEnv>()
     }
 
     updatePasswordHash(user.id, await hashPassword(newPassword))
+    // Revoke all existing sessions to invalidate any stolen tokens, then issue
+    // a fresh session for the caller. Mirrors scripts/reset-password.ts.
     deleteSessionsForUser(user.id)
     const { token } = createSession({
       userId: user.id,
       userAgent: c.req.header('user-agent') ?? null,
       ipAddress: c.req.header('x-forwarded-for') ?? null,
     })
+    touchLastLogin(user.id)
     c.header('set-cookie', buildSessionCookie(token))
     return c.body(null, 204)
   })
