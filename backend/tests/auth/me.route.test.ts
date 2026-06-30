@@ -14,7 +14,9 @@ import { createSession, listSessionsForUser } from '../../src/modules/auth/sessi
 import { insertUser } from '../../src/modules/auth/user.repo.ts'
 
 function appWithSession(token: string) {
-  const app = new Hono<AppEnv>()
+  // `strict: false` matches the production routing (T23 wires the same way)
+  // and lets `/me` collapse to `/me/` so subrouter `.get('/')` works.
+  const app = new Hono<AppEnv>({ strict: false })
   app.route('/me', meRoute)
   return (path: string, init: RequestInit = {}) =>
     app.request(`/me${path}`, {
