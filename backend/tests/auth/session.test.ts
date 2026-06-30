@@ -4,6 +4,8 @@ import {
   hashSessionToken,
   SESSION_MAX_AGE_MS,
   shouldSlide,
+  buildSessionCookie,
+  buildClearCookie,
 } from '../../src/modules/auth/session.ts'
 
 describe('session token', () => {
@@ -27,5 +29,20 @@ describe('session token', () => {
     const now = Date.now()
     expect(shouldSlide(now - 25 * 60 * 60 * 1000, now)).toBe(true)
     expect(shouldSlide(now - 1000, now)).toBe(false)
+  })
+})
+
+describe('cookie helpers', () => {
+  it('buildSessionCookie sets HttpOnly + SameSite=Lax + Path=/', () => {
+    const c = buildSessionCookie('tok')
+    expect(c).toContain('loopiq_sid=tok')
+    expect(c).toContain('HttpOnly')
+    expect(c.toLowerCase()).toContain('samesite=lax')
+    expect(c).toContain('Path=/')
+  })
+
+  it('buildClearCookie sets Max-Age=0', () => {
+    const c = buildClearCookie()
+    expect(c).toContain('Max-Age=0')
   })
 })
