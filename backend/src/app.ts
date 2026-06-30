@@ -4,12 +4,15 @@ import { requestId } from 'hono/request-id'
 import { secureHeaders } from 'hono/secure-headers'
 import type { Logger } from 'pino'
 import { requestLogger } from './middleware/request-logger.ts'
+import type { Session, User } from './modules/auth/auth.types.ts'
 import { healthRoute } from './modules/health/health.route.ts'
 
 export type AppEnv = {
   Variables: {
     requestId: string
     logger: Logger
+    user?: User
+    session?: Session
   }
 }
 
