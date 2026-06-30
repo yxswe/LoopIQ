@@ -9,6 +9,7 @@ import {
   cleanupExpiredSessions,
   createSession,
   deleteSession,
+  deleteSessionScopedToUser,
   findSessionByTokenHash,
   listSessionsForUser,
   slideSession,
@@ -90,5 +91,17 @@ describe('session.repo', () => {
     const remaining = listSessionsForUser(u.id).map((s) => s.id)
     expect(remaining).toContain(s2.id)
     expect(remaining).not.toContain(s1.id)
+  })
+
+  it('deleteSessionScopedToUser only deletes when ids match', () => {
+    const a = insertUser({ email: 'a@example.com', passwordHash: 'h', displayName: null, role: 'user', emailVerified: true })
+    const b = insertUser({ email: 'b@example.com', passwordHash: 'h', displayName: null, role: 'user', emailVerified: true })
+    const { session: sa } = createSession({ userId: a.id, userAgent: null, ipAddress: null })
+    // Wrong owner — should not delete.
+    expect(deleteSessionScopedToUser(sa.id, b.id)).toBe(false)
+    expect(listSessionsForUser(a.id).map((s) => s.id)).toContain(sa.id)
+    // Right owner — should delete.
+    expect(deleteSessionScopedToUser(sa.id, a.id)).toBe(true)
+    expect(listSessionsForUser(a.id).map((s) => s.id)).not.toContain(sa.id)
   })
 })

@@ -11,9 +11,12 @@ import {
   verifyPassword,
 } from './password.ts'
 import {
-  deleteSession,
+  createSession,
+  deleteSessionScopedToUser,
+  deleteSessionsForUser,
   listSessionsForUser,
 } from './session.repo.ts'
+import { buildSessionCookie } from './session.ts'
 import { getPasswordHash, updatePasswordHash } from './user.repo.ts'
 
 const passwordBody = z.object({
@@ -53,7 +56,14 @@ export const meRoute = new Hono<AppEnv>()
     }
 
     updatePasswordHash(user.id, await hashPassword(newPassword))
-    return new Response(null, { status: 204 })
+    deleteSessionsForUser(user.id)
+    const { token } = createSession({
+      userId: user.id,
+      userAgent: c.req.header('user-agent') ?? null,
+      ipAddress: c.req.header('x-forwarded-for') ?? null,
+    })
+    c.header('set-cookie', buildSessionCookie(token))
+    return c.body(null, 204)
   })
   .get('/sessions', (c) => {
     const user = c.get('user')!
@@ -69,6 +79,7 @@ export const meRoute = new Hono<AppEnv>()
     return c.json(list)
   })
   .delete('/sessions/:id', (c) => {
+    const user = c.get('user')!
     const session = c.get('session')!
     const targetId = c.req.param('id')
     if (targetId === session.id) {
@@ -77,6 +88,9 @@ export const meRoute = new Hono<AppEnv>()
         400,
       )
     }
-    deleteSession(targetId)
+    const deleted = deleteSessionScopedToUser(targetId, user.id)
+    if (!deleted) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Session not found' } }, 404)
+    }
     return new Response(null, { status: 204 })
   })

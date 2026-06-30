@@ -68,6 +68,13 @@ export function deleteSession(sessionId: string): void {
   getDb().prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
 }
 
+export function deleteSessionScopedToUser(sessionId: string, userId: string): boolean {
+  const result = getDb()
+    .prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?')
+    .run(sessionId, userId)
+  return result.changes > 0
+}
+
 export function deleteSessionsForUser(userId: string): void {
   getDb().prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
 }
