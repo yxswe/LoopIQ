@@ -51,3 +51,19 @@ export function insertEntryRow(row: EntryRow): void {
       row.payload_json,
     )
 }
+
+/**
+ * Atomically inserts an entry row and advances the conversation's leaf_id in a
+ * single transaction, so the row and the leaf pointer commit together (or not
+ * at all). Either write throwing rolls back both.
+ */
+export function appendEntryAndSetLeaf(
+  row: EntryRow,
+  conversationId: string,
+  leafId: string | null,
+): void {
+  getDb().transaction(() => {
+    insertEntryRow(row)
+    updateLeafId(conversationId, leafId)
+  })()
+}

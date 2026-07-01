@@ -5,7 +5,7 @@ import {
   type SessionTreeEntry,
 } from '@earendil-works/pi-agent-core'
 import { newId } from '../../db/id.ts'
-import { getConversation, insertEntryRow, listEntryRows, updateLeafId } from './conversation.repo.ts'
+import { appendEntryAndSetLeaf, getConversation, listEntryRows } from './conversation.repo.ts'
 
 function updateLabelCache(labelsById: Map<string, string>, entry: SessionTreeEntry): void {
   if (entry.type !== 'label') return
@@ -66,16 +66,28 @@ export class ConversationStorage implements SessionStorage<SessionMetadata> {
     return new ConversationStorage(conversationId, metadata, entries, startSeq)
   }
 
-  private persist(entry: SessionTreeEntry): void {
-    insertEntryRow({
-      conversation_id: this.conversationId,
-      id: entry.id,
-      seq: this.nextSeq++,
-      parent_id: entry.parentId,
-      type: entry.type,
-      created_at: Date.now(),
-      payload_json: JSON.stringify(entry),
-    })
+  /**
+   * Atomically persists an entry row and the resulting leaf pointer, then
+   * advances nextSeq. If the DB write throws, nextSeq is left untouched so a
+   * later retry does not skip a seq. Callers mutate in-memory state only after
+   * this returns, keeping memory and the DB in sync.
+   */
+  private persistEntryAndLeaf(entry: SessionTreeEntry, leafId: string | null): void {
+    const seq = this.nextSeq
+    appendEntryAndSetLeaf(
+      {
+        conversation_id: this.conversationId,
+        id: entry.id,
+        seq,
+        parent_id: entry.parentId,
+        type: entry.type,
+        created_at: Date.now(),
+        payload_json: JSON.stringify(entry),
+      },
+      this.conversationId,
+      leafId,
+    )
+    this.nextSeq = seq + 1
   }
 
   async getMetadata(): Promise<SessionMetadata> {
@@ -97,11 +109,10 @@ export class ConversationStorage implements SessionStorage<SessionMetadata> {
       timestamp: new Date().toISOString(),
       targetId: leafId,
     }
+    this.persistEntryAndLeaf(entry, leafId)
     this.entries.push(entry)
     this.byId.set(entry.id, entry)
-    this.persist(entry)
     this.leafId = leafId
-    updateLeafId(this.conversationId, leafId)
   }
 
   async createEntryId(): Promise<string> {
@@ -109,12 +120,12 @@ export class ConversationStorage implements SessionStorage<SessionMetadata> {
   }
 
   async appendEntry(entry: SessionTreeEntry): Promise<void> {
+    const nextLeafId = leafIdAfterEntry(entry)
+    this.persistEntryAndLeaf(entry, nextLeafId)
     this.entries.push(entry)
     this.byId.set(entry.id, entry)
     updateLabelCache(this.labelsById, entry)
-    this.persist(entry)
-    this.leafId = leafIdAfterEntry(entry)
-    updateLeafId(this.conversationId, this.leafId)
+    this.leafId = nextLeafId
   }
 
   async getEntry(id: string): Promise<SessionTreeEntry | undefined> {
