@@ -5,7 +5,10 @@ import { LiveConversation } from './conversation.ts'
 type AgentRuntime = { streamFn: StreamFn; model: Model<any>; systemPrompt?: string }
 
 let runtime: AgentRuntime | null = null
-const registry = new Map<string, LiveConversation>()
+// Cache the in-flight open *promise*, not the resolved value: concurrent callers
+// for the same id (e.g. the /events and /prompt handlers) must share one open()
+// so a single LiveConversation is bound to the conversation.
+const registry = new Map<string, Promise<LiveConversation>>()
 
 /** Configure the LLM runtime. Prod (index.ts) passes a real provider; tests pass faux. */
 export function configureAgentRuntime(next: AgentRuntime): void {
@@ -17,16 +20,22 @@ export function resetAgentRegistry(): void {
   registry.clear()
 }
 
-export async function getOrCreateConversation(conversationId: string): Promise<LiveConversation> {
-  const existing = registry.get(conversationId)
-  if (existing) return existing
-  if (!runtime) throw new Error('agent runtime not configured — call configureAgentRuntime()')
-  const lc = await LiveConversation.open({
-    conversationId,
-    streamFn: runtime.streamFn,
-    model: runtime.model,
-    systemPrompt: runtime.systemPrompt,
-  })
-  registry.set(conversationId, lc)
-  return lc
+export function getOrCreateConversation(conversationId: string): Promise<LiveConversation> {
+  let pending = registry.get(conversationId)
+  if (!pending) {
+    if (!runtime) {
+      return Promise.reject(new Error('agent runtime not configured — call configureAgentRuntime()'))
+    }
+    pending = LiveConversation.open({
+      conversationId,
+      streamFn: runtime.streamFn,
+      model: runtime.model,
+      systemPrompt: runtime.systemPrompt,
+    })
+    registry.set(conversationId, pending)
+    // If open() rejects, evict the poisoned promise so a later call can retry.
+    // This cleanup handle does not swallow the rejection the caller sees.
+    pending.catch(() => registry.delete(conversationId))
+  }
+  return pending
 }

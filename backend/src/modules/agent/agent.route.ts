@@ -40,6 +40,7 @@ export const agentRoute = new Hono<AppEnv>()
     const lc = await getOrCreateConversation(id)
     return streamSSE(c, async (stream) => {
       let closed = false
+      // Phase 0: unbounded queue, no backpressure (later phase).
       const queue: string[] = []
       let notify: (() => void) | null = null
       const wake = () => {
