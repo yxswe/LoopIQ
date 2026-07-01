@@ -6,6 +6,7 @@ import type { Logger } from 'pino'
 import { env } from './env.ts'
 import { originCheck } from './middleware/origin-check.ts'
 import { requestLogger } from './middleware/request-logger.ts'
+import { agentRoute } from './modules/agent/agent.route.ts'
 import { adminRoute } from './modules/auth/admin.route.ts'
 import { authRoute } from './modules/auth/auth.route.ts'
 import type { Session, User } from './modules/auth/auth.types.ts'
@@ -44,6 +45,7 @@ export function createApp() {
   app.route('/api/auth/oauth', oauthRoute)
   app.route('/api/me', meRoute)
   app.route('/api/admin', adminRoute)
+  app.route('/api/agent', agentRoute)
 
   return app
 }
