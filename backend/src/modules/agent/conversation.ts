@@ -47,7 +47,13 @@ export class LiveConversation {
       if (event.type === 'message_end') {
         await lc.session.appendMessage(event.message)
       }
-      for (const listener of lc.listeners) listener(event)
+      for (const listener of lc.listeners) {
+        try {
+          listener(event)
+        } catch {
+          // Isolate subscriber faults from the agent run and from other subscribers.
+        }
+      }
     })
 
     return lc
@@ -58,8 +64,12 @@ export class LiveConversation {
     return () => this.listeners.delete(listener)
   }
 
-  /** Start the agent run. The user turn is persisted by the `message_end`
-   * handler along with the assistant turn. Does not await run completion. */
+  /**
+   * Runs one turn. Resolves when the agent run completes (including message_end
+   * persistence and listener settlement). Streaming/incremental results are
+   * observed via subscribe(), not via the return value; callers that must not
+   * block on the full run (e.g. the SSE control-plane route) should not await it.
+   */
   async prompt(text: string): Promise<void> {
     await this.agent.prompt(text)
   }
