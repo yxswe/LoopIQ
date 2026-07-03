@@ -56,6 +56,35 @@ const migrations: Migration[] = [
       CREATE INDEX invitations_code_idx ON invitations(code);
     `,
   },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE conversations (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name       TEXT,
+        leaf_id    TEXT,
+        model_json TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX conversations_user_idx ON conversations(user_id);
+
+      CREATE TABLE conversation_entries (
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        id              TEXT NOT NULL,
+        seq             INTEGER NOT NULL,
+        parent_id       TEXT,
+        type            TEXT NOT NULL,
+        created_at      INTEGER NOT NULL,
+        payload_json    TEXT NOT NULL,
+        PRIMARY KEY (conversation_id, id)
+      );
+      CREATE INDEX conversation_entries_seq_idx ON conversation_entries(conversation_id, seq);
+      CREATE INDEX conversation_entries_type_idx ON conversation_entries(conversation_id, type);
+      CREATE INDEX conversation_entries_parent_idx ON conversation_entries(conversation_id, parent_id);
+    `,
+  },
 ]
 
 export function applyMigrations(db: DB): void {

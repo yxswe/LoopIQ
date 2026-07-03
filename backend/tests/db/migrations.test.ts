@@ -51,6 +51,6 @@ describe('db/migrations', () => {
     applyMigrations(db)
     expect(() => applyMigrations(db)).not.toThrow()
     const applied = db.prepare('SELECT COUNT(*) as c FROM _migrations').get() as { c: number }
-    expect(applied.c).toBe(1)
+    expect(applied.c).toBe(2)
   })
 })

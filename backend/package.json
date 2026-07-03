@@ -15,6 +15,8 @@
     "format": "biome format --write ."
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.80.3",
+    "@earendil-works/pi-ai": "^0.80.3",
     "@hono/node-server": "^2.0.6",
     "@hono/zod-validator": "^0.8.0",
     "argon2": "^0.44.0",
